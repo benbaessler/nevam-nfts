@@ -7,6 +7,9 @@ async function main() {
   await contract.deployed();
 
   console.log("Contract deployed to:", contract.address);
+
+  await contract.mint([1])
+  console.log("Minted tier 1")
 }
 
 main()
