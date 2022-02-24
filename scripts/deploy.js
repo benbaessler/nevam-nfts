@@ -9,6 +9,7 @@ async function main() {
   console.log("Contract deployed to:", contract.address);
 
   await contract.mintBatch([1, 2, 3], [210, 150, 40])
+  console.log('Batch minted allocated tokens.')
 }
 
 main()
