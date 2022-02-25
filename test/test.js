@@ -28,4 +28,38 @@ describe('Token contract', () => {
     })
   })
 
+  describe('Private minting', () => {
+    it('Should be able for owner to mint team-allocated tokens', async () => {
+      await contract.mintPrivate([1, 2, 3], [210, 150, 40])
+
+      // Checking if mint was successful
+      let response = await contract.balanceOf(owner.address, 1)
+      expect(response).to.equal(210)
+
+      response = await contract.balanceOf(owner.address, 2)
+      expect(response).to.equal(150)
+
+      response = await contract.balanceOf(owner.address, 3)
+      expect(response).to.equal(40)
+
+      // Checking if supply has updated
+      response = await contract.amountLeft(1)
+      expect(response).to.equal(1200)
+
+      response = await contract.amountLeft(2)
+      expect(response).to.equal(500)
+
+      response = await contract.amountLeft(3)
+      expect(response).to.equal(100)
+    })
+
+    it('Should not be able for user to mint team-allocated tokens', async () => {
+      await contract.connect(user1)
+
+      await expect(contract.connect(user1).mintPrivate([1, 2, 3], [10, 10, 10]))
+        .to.be.revertedWith('Ownable: caller is not the owner')
+    })
+
+
+  })
 })
