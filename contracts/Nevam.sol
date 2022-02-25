@@ -47,7 +47,7 @@ contract Nevam is ERC1155, Ownable {
   }
 
   // Remove _amounts and replace with [1, 1, 1] in function.
-  function mintBatch(uint256[] memory _ids, uint256[] memory _amounts) external onlyExternal {
+  function mintBatch(uint256[] memory _ids) external onlyExternal {
     require(saleStatus != SaleStatus.CLOSED, "Sale is not active");
 
     if (saleStatus == SaleStatus.PRESALE) {
@@ -56,6 +56,8 @@ contract Nevam is ERC1155, Ownable {
 
     require(_ids.length < 4, "You can only mint a maximum of 3 tokens");
 
+    uint256[] memory amounts = new uint256[](_ids.length);
+
     for (uint256 i = 0; i < _ids.length; i++) {
       uint256 id = _ids[i];
 
@@ -63,13 +65,12 @@ contract Nevam is ERC1155, Ownable {
       require(amountLeft[id] > 0, "All tokens with this ID were already minted");
       require(mintedTier[id][msg.sender] == false, "You already minted this token");
 
+      amounts[i] = 1;
       mintedTier[id][msg.sender] = true;
       amountLeft[id] -= 1;
     }
 
-    for (uint256 i = 0; i < _amounts.length; i++) { require(_amounts[i] == 1); }
-
-    _mintBatch(msg.sender, _ids, _amounts, "");
+    _mintBatch(msg.sender, _ids, amounts, "");
   }
 
   // Private batch minting function, does not check for payment.
