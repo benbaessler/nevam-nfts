@@ -30,7 +30,11 @@ contract Nevam is ERC1155, Ownable {
   }
 
   function mint(uint256 _id) external onlyExternal {
-    require(saleStatus == SaleStatus.PUBLIC, "Public sale is not active");
+    require(saleStatus != SaleStatus.CLOSED, "Sale is not active");
+
+    if (saleStatus == SaleStatus.PRESALE) {
+      require(whitelisted[msg.sender], "You are not whitelisted");
+    }
 
     require(_id < 4, "Invalid token ID");
     require(amountLeft[_id] > 0, "All tokens with this ID were already minted");
@@ -42,8 +46,14 @@ contract Nevam is ERC1155, Ownable {
     _mint(msg.sender, _id, 1, "");
   }
 
+  // Remove _amounts and replace with [1, 1, 1] in function.
   function mintBatch(uint256[] memory _ids, uint256[] memory _amounts) external onlyExternal {
-    require(saleStatus == SaleStatus.PUBLIC, "Public sale is not active");
+    require(saleStatus != SaleStatus.CLOSED, "Sale is not active");
+
+    if (saleStatus == SaleStatus.PRESALE) {
+      require(whitelisted[msg.sender], "You are not whitelisted");
+    }
+
     require(_ids.length < 4, "You can only mint a maximum of 3 tokens");
 
     for (uint256 i = 0; i < _ids.length; i++) {
@@ -52,6 +62,9 @@ contract Nevam is ERC1155, Ownable {
       require(id < 4, "Invalid token ID");
       require(amountLeft[id] > 0, "All tokens with this ID were already minted");
       require(mintedTier[id][msg.sender] == false, "You already minted this token");
+
+      mintedTier[id][msg.sender] = true;
+      amountLeft[id] -= 1;
     }
 
     for (uint256 i = 0; i < _amounts.length; i++) { require(_amounts[i] == 1); }
@@ -59,22 +72,12 @@ contract Nevam is ERC1155, Ownable {
     _mintBatch(msg.sender, _ids, _amounts, "");
   }
 
-  function mintPresale(uint256 _id) external onlyExternal {
-    require(saleStatus == SaleStatus.PRESALE, "Presale sale is not active");
-    require(whitelisted[msg.sender], "You are not whitelisted");
-
-    require(_id < 4, "Invalid token ID");
-    require(amountLeft[_id] > 0, "All tokens with this ID were already minted");
-    require(mintedTier[_id][msg.sender] == false, "You already minted this token");
-
-    mintedTier[_id][msg.sender] = true;
-    amountLeft[_id] -= 1;
-
-    _mint(msg.sender, _id, 1, "");
-  }
-
   // Private batch minting function, does not check for payment.
-  function mintPrivate(uint256[] memory _ids, uint256[] memory _amounts) external onlyOwner onlyExternal {
+  function mintPrivate(uint256[] memory _ids, uint256[] memory _amounts) external onlyOwner {
+    for (uint256 i = 0; i < _amounts.length; i++) {
+      amountLeft[i + 1] -= _amounts[i];
+    }
+
     _mintBatch(msg.sender, _ids, _amounts, "");
   }
 
