@@ -29,28 +29,35 @@ contract Nevam is ERC1155, Ownable {
     amountLeft[3] = TIER_3_SUPPLY;
   }
 
+  // With _ storage vars: 75258 
+  // Without _ storage vars: 78580   
   function mint(uint256 _id) external onlyExternal {
-    require(saleStatus != SaleStatus.CLOSED, "Sale is not active");
+    SaleStatus _status = saleStatus;
+    require(_status != SaleStatus.CLOSED, "Sale is not active");
 
-    if (saleStatus == SaleStatus.PRESALE) {
+    if (_status == SaleStatus.PRESALE) {
       require(whitelisted[msg.sender], "You are not whitelisted");
     }
 
-    require(_id < 4, "Invalid token ID");
-    require(amountLeft[_id] > 0, "All tokens with this ID were already minted");
-    require(mintedTier[_id][msg.sender] == false, "You already minted this token");
+    mapping(address => bool) storage _minted = mintedTier[_id];
+    uint256 _amountLeft = amountLeft[_id];
 
-    mintedTier[_id][msg.sender] = true;
-    amountLeft[_id] -= 1;
+    require(_id < 4, "Invalid token ID");
+    require(_amountLeft > 0, "All tokens with this ID were already minted");
+    require(_minted[msg.sender] == false, "You already minted this token");
+
+    _minted[msg.sender] = true;
+    _amountLeft -= 1;
 
     _mint(msg.sender, _id, 1, "");
   }
 
   // Remove _amounts and replace with [1, 1, 1] in function.
   function mintBatch(uint256[] memory _ids) external onlyExternal {
-    require(saleStatus != SaleStatus.CLOSED, "Sale is not active");
+    SaleStatus _status = saleStatus;
+    require(_status != SaleStatus.CLOSED, "Sale is not active");
 
-    if (saleStatus == SaleStatus.PRESALE) {
+    if (_status == SaleStatus.PRESALE) {
       require(whitelisted[msg.sender], "You are not whitelisted");
     }
 
@@ -60,14 +67,16 @@ contract Nevam is ERC1155, Ownable {
 
     for (uint256 i = 0; i < _ids.length; i++) {
       uint256 id = _ids[i];
+      mapping(address => bool) storage _minted = mintedTier[id];
+      uint256 _amountLeft = amountLeft[id];
 
       require(id < 4, "Invalid token ID");
-      require(amountLeft[id] > 0, "All tokens with this ID were already minted");
-      require(mintedTier[id][msg.sender] == false, "You already minted this token");
+      require(_amountLeft > 0, "All tokens with this ID were already minted");
+      require(_minted[msg.sender] == false, "You already minted this token");
 
       amounts[i] = 1;
-      mintedTier[id][msg.sender] = true;
-      amountLeft[id] -= 1;
+      _minted[msg.sender] = true;
+      _amountLeft -= 1;
     }
 
     _mintBatch(msg.sender, _ids, amounts, "");
