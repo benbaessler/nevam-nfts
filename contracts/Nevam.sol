@@ -2,15 +2,15 @@
 pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
-contract Nevam is ERC1155, Ownable {
+contract Nevam is ERC1155 {
 
   enum SaleStatus { CLOSED, PRESALE, PUBLIC }
 
   SaleStatus public saleStatus = SaleStatus.CLOSED;
   uint256[] public amountsLeft = [1410, 650, 140];
+  address private owner;
 
   // IMPORTANT!: Set MerkleRoot hash (for whitelist)
   bytes32 public merkleRoot = 0x0;
@@ -23,7 +23,14 @@ contract Nevam is ERC1155, Ownable {
   }
 
   // IMPORTANT!: Set IPFS metadata URI
-  constructor() ERC1155("ipfs://QmeEW8VV7gzTd64dcgYmw7EL2QqrRszNzwopGV9VVt8XC9/{id}.json") {}
+  constructor() ERC1155("ipfs://QmeEW8VV7gzTd64dcgYmw7EL2QqrRszNzwopGV9VVt8XC9/{id}.json") {
+    owner = msg.sender;
+  }
+
+  modifier onlyOwner() {
+    require(msg.sender == owner, "You are not the owner of this contract");
+    _;
+  }
 
   modifier isAvailable(uint256 _id) {
     require(_id < 4, "Invalid token ID");
