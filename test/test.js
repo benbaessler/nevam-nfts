@@ -16,37 +16,42 @@ describe('Token contract', () => {
 
   describe('Deployment', () => {
     it('Should set the initial supply', async () => {
-      let response = await contract.amountLeft(1)
-      expect(response).to.equal(1410)
+      let response = await contract.getAmountsLeft()
 
-      response = await contract.amountLeft(2)
-      expect(response).to.equal(650)
-
-      response = await contract.amountLeft(3)
-      expect(response).to.equal(140)
+      expect(response[0]).to.equal(1410)
+      expect(response[1]).to.equal(650)
+      expect(response[2]).to.equal(140)
     })
   })
 
   describe('Sale status', () => {
-    it('Should not be able to mint if sale is closed', async () => {
-      await expect(contract.mint(1)).to.be.revertedWith('Sale is not active')
-    })
-
-    it('Should only be able for whitelisted accounts to mint during presale', async () => {
-      await contract.setSaleStatus(1)
-      await contract.setWhitelist([user.address])
-
-      await expect(contract.mint(1)).to.be.revertedWith('You are not whitelisted')
-
+    it('Should allow owner to set the sale status', async () => {
+      await expect(contract.connect(user).mint(1)).to.be.revertedWith('Sale is not active')
+      
+      await contract.setSaleStatus(2)
       await contract.connect(user).mint(1)
-
+      
       const response = await contract.balanceOf(user.address, 1)
       expect(response).to.equal(1)
     })
 
+    it('Should not be able to mint if sale is closed', async () => {
+      await expect(contract.mint(1)).to.be.revertedWith('Sale is not active')
+    })
+
+    // it('Should only be able for whitelisted accounts to mint during presale', async () => {
+    //   await contract.setSaleStatus(1)
+
+    //   await expect(contract.mint(1)).to.be.revertedWith('You are not whitelisted')
+
+    //   await contract.connect(user).mint(1)
+
+    //   const response = await contract.balanceOf(user.address, 1)
+    //   expect(response).to.equal(1)
+    // })
+
     it('Should be able for anyone to mint during public sale', async () => {
       await contract.setSaleStatus(2)
-      await contract.setWhitelist([user.address])
 
       await contract.mint(1)
       await contract.connect(user).mint(1)
@@ -81,8 +86,8 @@ describe('Token contract', () => {
     it('Should update the supply', async () => {
       await contract.mint(1)
 
-      const response = await contract.amountLeft(1)
-      expect(response).to.equal(1409)
+      const response = await contract.getAmountsLeft()
+      expect(response[0]).to.equal(1409)
     })
 
     it('Should update the users token balance', async () => {
@@ -109,14 +114,11 @@ describe('Token contract', () => {
     it('Should update the supply of all minted tokens', async () => {
       await contract.mintBatch([1, 2, 3])
 
-      response = await contract.amountLeft(1)
-      expect(response).to.equal(1409)
+      let response = await contract.getAmountsLeft()
 
-      response = await contract.amountLeft(2)
-      expect(response).to.equal(649)
-
-      response = await contract.amountLeft(3)
-      expect(response).to.equal(139)
+      expect(response[0]).to.equal(1409)
+      expect(response[1]).to.equal(649)
+      expect(response[2]).to.equal(139)
     })
   })
 
@@ -135,19 +137,16 @@ describe('Token contract', () => {
       expect(response).to.equal(40)
 
       // Checking if supply has updated
-      response = await contract.amountLeft(1)
-      expect(response).to.equal(1200)
-
-      response = await contract.amountLeft(2)
-      expect(response).to.equal(500)
-
-      response = await contract.amountLeft(3)
-      expect(response).to.equal(100)
+      response = await contract.getAmountsLeft()
+      
+      expect(response[0]).to.equal(1200)
+      expect(response[1]).to.equal(500)
+      expect(response[2]).to.equal(100)
     })
 
     it('Should not be able for user to mint team-allocated tokens', async () => {
       await expect(contract.connect(user).mintPrivate([1, 2, 3], [10, 10, 10]))
-        .to.be.revertedWith('Ownable: caller is not the owner')
+        .to.be.revertedWith('You are not the owner of this contract')
     })
   })  
 })
