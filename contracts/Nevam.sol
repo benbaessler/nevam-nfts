@@ -3,89 +3,115 @@ pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
 contract Nevam is ERC1155, Ownable {
 
   enum SaleStatus { CLOSED, PRESALE, PUBLIC }
 
-  uint256 public constant TIER_1_SUPPLY = 1410;
-  uint256 public constant TIER_2_SUPPLY = 650;
-  uint256 public constant TIER_3_SUPPLY = 140;
-
   SaleStatus public saleStatus = SaleStatus.CLOSED;
+  uint256[] public amountsLeft = [1410, 650, 140];
 
-  mapping(uint256 => uint256) public amountLeft;
-  mapping(uint256 => mapping(address => bool)) public mintedTier;
-  mapping(address => bool) public whitelisted;
+  // IMPORTANT!: Set MerkleRoot hash (for whitelist)
+  bytes32 public merkleRoot = 0x0;
+
+  mapping(address => mapping(uint256 => bool)) public mintedTier;
 
   modifier onlyExternal() {
     require(msg.sender == tx.origin, "Contracts are not allowed to mint");
     _;
   }
 
-  constructor() ERC1155("ipfs://QmeEW8VV7gzTd64dcgYmw7EL2QqrRszNzwopGV9VVt8XC9/{id}.json") {
-    amountLeft[1] = TIER_1_SUPPLY;
-    amountLeft[2] = TIER_2_SUPPLY;
-    amountLeft[3] = TIER_3_SUPPLY;
+  // IMPORTANT!: Set IPFS metadata URI
+  constructor() ERC1155("ipfs://QmeEW8VV7gzTd64dcgYmw7EL2QqrRszNzwopGV9VVt8XC9/{id}.json") {}
+
+  modifier isAvailable(uint256 _id) {
+    require(_id < 4, "Invalid token ID");
+    require(amountsLeft[_id - 1] > 0, "All tokens with this ID were already minted");
+    _;
   }
 
-  // With _ storage vars: 75258 
-  // Without _ storage vars: 78580   
-  function mint(uint256 _id) external onlyExternal {
-    SaleStatus _status = saleStatus;
-    require(_status != SaleStatus.CLOSED, "Sale is not active");
+  function mintPresale(uint256 _id, bytes32[] calldata _merkleProof) external onlyExternal isAvailable(_id) {
+    require(saleStatus == SaleStatus.PRESALE, "Presale is not active");
 
-    if (_status == SaleStatus.PRESALE) {
-      require(whitelisted[msg.sender], "You are not whitelisted");
-    }
+    bool _mintedTier = mintedTier[msg.sender][_id];
+    require(!_mintedTier, "You already minted this token");
 
-    mapping(address => bool) storage _minted = mintedTier[_id];
-    uint256 _amountLeft = amountLeft[_id];
+    bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
+    require(MerkleProof.verify(_merkleProof, merkleRoot, leaf), "You are not whitelisted");
 
-    require(_id < 4, "Invalid token ID");
-    require(_amountLeft > 0, "All tokens with this ID were already minted");
-    require(_minted[msg.sender] == false, "You already minted this token");
-
-    _minted[msg.sender] = true;
-    _amountLeft -= 1;
+    // @dev: ! Test that mintedTier really updates
+    _mintedTier = true;
+    amountsLeft[_id - 1] -= 1;
 
     _mint(msg.sender, _id, 1, "");
   }
 
-  // Remove _amounts and replace with [1, 1, 1] in function.
-  function mintBatch(uint256[] memory _ids) external onlyExternal {
-    SaleStatus _status = saleStatus;
-    require(_status != SaleStatus.CLOSED, "Sale is not active");
-
-    if (_status == SaleStatus.PRESALE) {
-      require(whitelisted[msg.sender], "You are not whitelisted");
-    }
-
+  function mintBatchPresale(uint256[] calldata _ids, bytes32[] calldata _merkleProof) external onlyExternal {
+    require(saleStatus == SaleStatus.PUBLIC, "Sale is not active");
     require(_ids.length < 4, "You can only mint a maximum of 3 tokens");
 
+    bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
+    require(MerkleProof.verify(_merkleProof, merkleRoot, leaf), "You are not whitelisted");
+
+    mapping(uint256 => bool) storage _mintedTier = mintedTier[msg.sender];
+
+    // Create new array, change and assign to amountsLeft at the end of loop
+    uint256[] memory _amountsLeft = amountsLeft;
     uint256[] memory amounts = new uint256[](_ids.length);
 
     for (uint256 i = 0; i < _ids.length; i++) {
       uint256 id = _ids[i];
-      mapping(address => bool) storage _minted = mintedTier[id];
-      uint256 _amountLeft = amountLeft[id];
 
       require(id < 4, "Invalid token ID");
-      require(_amountLeft > 0, "All tokens with this ID were already minted");
-      require(_minted[msg.sender] == false, "You already minted this token");
+      require(_amountsLeft[i] > 0, "All tokens with this ID were already minted");
+      require(!_mintedTier[id], "You already minted this token");
 
-      amounts[i] = 1;
-      _minted[msg.sender] = true;
-      _amountLeft -= 1;
+      _amountsLeft[i] -= 1;
+      _mintedTier[id] = true;
     }
 
+    amountsLeft = _amountsLeft;
+    _mintBatch(msg.sender, _ids, amounts, "");
+  }
+
+  function mint(uint256 _id) public onlyExternal isAvailable(_id) {
+    require(saleStatus == SaleStatus.PUBLIC, "Sale is not active");
+    require(!mintedTier[msg.sender][_id], "You already minted this token");
+
+    mintedTier[msg.sender][_id] = true;
+    amountsLeft[_id - 1] -= 1;
+
+    _mint(msg.sender, _id, 1, "");
+  }
+
+  function mintBatch(uint256[] calldata _ids) external onlyExternal {
+    require(saleStatus == SaleStatus.PUBLIC, "Sale is not active");
+    require(_ids.length < 4, "You can only mint a maximum of 3 tokens");
+
+    mapping(uint256 => bool) storage _mintedTier = mintedTier[msg.sender];
+
+    uint256[] storage _amountsLeft = amountsLeft;
+    uint256[] memory amounts = new uint256[](_ids.length);
+
+    for (uint256 i = 0; i < _ids.length; i++) {
+      uint256 id = _ids[i];
+
+      require(id < 4, "Invalid token ID");
+      require(_amountsLeft[i] > 0, "All tokens with this ID were already minted");
+      require(!_mintedTier[id], "You already minted this token");
+
+      _amountsLeft[i] -= 1;
+      _mintedTier[id] = true;
+    }
+    
     _mintBatch(msg.sender, _ids, amounts, "");
   }
 
   // Private batch minting function, does not check for payment.
   function mintPrivate(uint256[] memory _ids, uint256[] memory _amounts) external onlyOwner {
     for (uint256 i = 0; i < _amounts.length; i++) {
-      amountLeft[i + 1] -= _amounts[i];
+      amountsLeft[i] -= _amounts[i];
     }
 
     _mintBatch(msg.sender, _ids, _amounts, "");
@@ -96,10 +122,8 @@ contract Nevam is ERC1155, Ownable {
     saleStatus = SaleStatus(_status);
   }
 
-  function setWhitelist(address[] memory _addresses) external onlyOwner {
-    for (uint256 i = 0; i < _addresses.length; i++) {
-      whitelisted[_addresses[i]] = true;
-    }
-  }
+  function getAmountsLeft() external view returns(uint256[] memory) {
+    return amountsLeft;
+  } 
 
 }
