@@ -33,15 +33,13 @@ contract Nevam is ERC1155, Ownable {
 
   function mintPresale(uint256 _id, bytes32[] calldata _merkleProof) external onlyExternal isAvailable(_id) {
     require(saleStatus == SaleStatus.PRESALE, "Presale is not active");
-
-    bool _mintedTier = mintedTier[msg.sender][_id];
-    require(!_mintedTier, "You already minted this token");
+    require(!mintedTier[msg.sender][_id], "You already minted this token");
 
     bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
     require(MerkleProof.verify(_merkleProof, merkleRoot, leaf), "You are not whitelisted");
 
     // @dev: ! Test that mintedTier really updates
-    _mintedTier = true;
+    mintedTier[msg.sender][_id] = true;
     amountsLeft[_id - 1] -= 1;
 
     _mint(msg.sender, _id, 1, "");
