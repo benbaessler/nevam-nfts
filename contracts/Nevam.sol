@@ -32,20 +32,19 @@ contract Nevam is ERC1155 {
     _;
   }
 
-  modifier isAvailable(uint256 _id) {
+  modifier mintable(uint256 _id) {
     require(_id < 4, "Invalid token ID");
     require(amountsLeft[_id - 1] > 0, "All tokens with this ID were already minted");
+    require(!mintedTier[msg.sender][_id], "You already minted this token");
     _;
   }
 
-  function mintPresale(uint256 _id, bytes32[] calldata _merkleProof) external onlyExternal isAvailable(_id) {
+  function mintPresale(uint256 _id, bytes32[] calldata _merkleProof) external onlyExternal mintable(_id) {
     require(saleStatus == SaleStatus.PRESALE, "Presale is not active");
-    require(!mintedTier[msg.sender][_id], "You already minted this token");
 
     bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
     require(MerkleProof.verify(_merkleProof, merkleRoot, leaf), "You are not whitelisted");
 
-    // @dev: ! Test that mintedTier really updates
     mintedTier[msg.sender][_id] = true;
     amountsLeft[_id - 1] -= 1;
 
@@ -61,7 +60,6 @@ contract Nevam is ERC1155 {
 
     mapping(uint256 => bool) storage _mintedTier = mintedTier[msg.sender];
 
-    // Create new array, change and assign to amountsLeft at the end of loop
     uint256[] memory _amountsLeft = amountsLeft;
     uint256[] memory amounts = new uint256[](_ids.length);
 
@@ -80,16 +78,16 @@ contract Nevam is ERC1155 {
     _mintBatch(msg.sender, _ids, amounts, "");
   }
 
-  function mint(uint256 _id) public onlyExternal isAvailable(_id) {
+  function mint(uint256 _id) public onlyExternal mintable(_id) {
     require(saleStatus == SaleStatus.PUBLIC, "Sale is not active");
-    require(!mintedTier[msg.sender][_id], "You already minted this token");
 
     mintedTier[msg.sender][_id] = true;
     amountsLeft[_id - 1] -= 1;
 
     _mint(msg.sender, _id, 1, "");
   }
-
+  
+  // For minting multiple tokens at once
   function mintBatch(uint256[] calldata _ids) external onlyExternal {
     require(saleStatus == SaleStatus.PUBLIC, "Sale is not active");
     require(_ids.length < 4, "You can only mint a maximum of 3 tokens");
