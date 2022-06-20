@@ -1,15 +1,11 @@
-# Basic Sample Hardhat Project
+# Nevam's NFT collection
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, a sample script that deploys that contract, and an example of a task implementation, which simply lists the available accounts.
+ERC-1155 NFT smart contract for Nevam's upcoming collection on Polygon Mainnet.
 
-Try running some of the following tasks:
+# Guide
 
-```shell
-npx hardhat accounts
-npx hardhat compile
-npx hardhat clean
-npx hardhat test
-npx hardhat node
-node scripts/sample-script.js
-npx hardhat help
-```
+1. Clone repository to your local machine.
+
+2. Install dependencies with `npm i`.
+
+3. Run Chai tests using `npx hardhat test`.
